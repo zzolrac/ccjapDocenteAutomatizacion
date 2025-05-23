@@ -184,7 +184,8 @@ graph TB
    - Pruebas unitarias
    - Pruebas de integración
    - Pruebas de usuario final
-
+cd /opt/ccjap
+docker-compose down
 4. **Despliegue**:
    - Preparar contenedores Docker
    - Configuración de VPS

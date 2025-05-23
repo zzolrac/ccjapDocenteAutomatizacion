@@ -1,2 +1,0 @@
-{"__type":"$$EventMessageAudit","id":"51e7c70a-6fad-4ba5-a75f-f9d7cbdc45c9","ts":"2025-05-21T06:53:56.050+00:00","eventName":"n8n.audit.user.api.created","message":"n8n.audit.user.api.created","payload":{"userId":"49db066b-59f6-4bd6-8f5f-a663a0a1b732","_email":"maritokun24@gmail.com","_firstName":"Carlos Mario ","_lastName":"Fuentes","globalRole":"global:owner"}}
-{"__type":"$$EventMessageConfirm","confirm":"51e7c70a-6fad-4ba5-a75f-f9d7cbdc45c9","ts":"2025-05-21T06:53:56.051+00:00","source":{"id":"0","name":"eventBus"}}
