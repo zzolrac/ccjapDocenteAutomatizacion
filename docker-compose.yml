@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ccjap_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ccjapuser
+      POSTGRES_PASSWORD: ccjappassword # Consider using secrets for production
+      POSTGRES_DB: ccjapdb
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ccjap_network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ccjap_n8n
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME} # Will need to be configured for actual deployment
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http # Change to https for production with a reverse proxy
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/ # Adjust if using a reverse proxy or different domain
+      - GENERIC_TIMEZONE=America/El_Salvador
+      # Database settings for n8n to use PostgreSQL
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=ccjapdb # Can be the same or a different DB for n8n
+      - DB_POSTGRESDB_USER=ccjapuser
+      - DB_POSTGRESDB_PASSWORD=ccjappassword
+      # Optional: n8n user management (if not using external auth)
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=maritokun24@gmail.com
+      - N8N_BASIC_AUTH_PASSWORD=K@rur0su24 # Change this!
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    depends_on:
+      - postgres
+    networks:
+      - ccjap_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ccjap_backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/usr/src/app
+      # - /usr/src/app/node_modules # Temporarily remove to rely on local node_modules
+    environment:
+      - PORT=3001
+      # Add database connection details for the backend
+      - DATABASE_URL=postgresql://ccjapuser:ccjappassword@postgres:5432/ccjapdb
+      - N8N_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0OWRiMDY2Yi01OWY2LTRiZDYtOGY1Zi1hNjYzYTBhMWI3MzIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQ3MDIzNDAzfQ.MN0EUm5SgnY5XvE-ThcImYgrnmr16bAkU3GG_6zo8Jo
+      # For development, ensure NODE_ENV is set if your app uses it
+      - NODE_ENV=development
+    depends_on:
+      - postgres
+    networks:
+      - ccjap_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ccjap_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:5173" # Map host 3000 to container 5173 (Vite default)
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevent local node_modules from overwriting container's
+    # depends_on: # Not strictly necessary for Vite dev server unless it makes API calls at build time
+      # - backend 
+    networks:
+      - ccjap_network
+
+networks:
+  ccjap_network:
+    driver: bridge
