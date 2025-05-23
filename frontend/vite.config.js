@@ -10,6 +10,7 @@ export default defineConfig({
         target: 'http://backend:3001', // Usar el nombre del servicio Docker
         changeOrigin: true,
         // rewrite: (path) => path.replace(/^\/api/, '') // Opcional: si necesitas reescribir la ruta
+        allowedHosts: ['ccjap.echolab.xyz']
       }
     }
   }
