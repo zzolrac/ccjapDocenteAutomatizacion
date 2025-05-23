@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Camera, User, X } from 'lucide-react';
 
 function RegisterAlumnoForm() {
   const navigate = useNavigate();
@@ -17,8 +18,55 @@ function RegisterAlumnoForm() {
     grado_actual: '',
     seccion: '',
     fecha_ingreso: new Date().toISOString().split('T')[0], // Fecha actual en formato YYYY-MM-DD
-    estado: 'Activo'
+    estado: 'Activo',
+    foto_perfil_url: '',
+    // La institución se asignará automáticamente del usuario actual
+    institucion_id: currentUser?.institucion_id || ''
   });
+  
+  const [previewImage, setPreviewImage] = useState(null);
+  const fileInputRef = useRef(null);
+  
+  // Función para manejar la selección de imagen
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tipo de archivo
+      if (!file.type.match('image.*')) {
+        setError('Por favor, selecciona un archivo de imagen válido.');
+        return;
+      }
+      
+      // Validar tamaño (máx 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('La imagen no debe pesar más de 2MB.');
+        return;
+      }
+      
+      // Crear vista previa
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result);
+        setFormData({
+          ...formData,
+          foto_perfil_url: reader.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  // Función para eliminar la imagen seleccionada
+  const handleRemoveImage = () => {
+    setPreviewImage(null);
+    setFormData({
+      ...formData,
+      foto_perfil_url: ''
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
   
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -41,11 +89,25 @@ function RegisterAlumnoForm() {
       setError('Nombre completo, grado y sección son campos requeridos.');
       return;
     }
+    
+    // Validar tamaño de la imagen si existe
+    if (formData.foto_perfil_url && formData.foto_perfil_url.length > 2 * 1024 * 1024) {
+      setError('La imagen es demasiado grande. El tamaño máximo permitido es de 2MB.');
+      return;
+    }
 
     try {
       if (!token || !currentUser) {
         setError('No autenticado o datos de usuario no disponibles. Por favor, inicie sesión de nuevo.');
         return;
+      }
+      
+      // Asegurarse de que la institución del usuario actual se use
+      if (!formData.institucion_id && currentUser.institucion_id) {
+        setFormData(prev => ({
+          ...prev,
+          institucion_id: currentUser.institucion_id
+        }));
       }
 
       const response = await fetch('/api/alumnos', { 
@@ -54,10 +116,7 @@ function RegisterAlumnoForm() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`, 
         },
-        body: JSON.stringify({
-          ...formData,
-          institucion_id: currentUser.institucion_id // Usar institucion_id del usuario autenticado
-        }), 
+        body: JSON.stringify(formData), 
       });
 
       const responseText = await response.text();
@@ -87,8 +146,60 @@ function RegisterAlumnoForm() {
   };
 
   return (
-    <div className="p-8 bg-white dark:bg-dark-card-bg shadow-xl rounded-lg max-w-2xl mx-auto mt-4 border border-transparent dark:border-dark-border">
-      <h2 className="text-2xl font-bold text-center text-slate-700 dark:text-dark-text mb-6">Registrar Nuevo Alumno</h2>
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md dark:bg-slate-800">
+      <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Registrar Nuevo Alumno</h1>
+      
+      {/* Sección de foto de perfil */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+          Foto de Perfil
+        </label>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            {previewImage ? (
+              <div className="relative group">
+                <img 
+                  src={previewImage} 
+                  alt="Vista previa" 
+                  className="w-24 h-24 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                  title="Eliminar imagen"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                <User size={32} className="text-slate-400" />
+              </div>
+            )}
+          </div>
+          <div>
+            <input
+              type="file"
+              id="foto_perfil"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleImageChange}
+              className="hidden"
+            />
+            <label
+              htmlFor="foto_perfil"
+              className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              {previewImage ? 'Cambiar imagen' : 'Subir imagen'}
+            </label>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Formatos: JPG, PNG. Tamaño máximo: 2MB
+            </p>
+          </div>
+        </div>
+      </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Información básica del alumno */}
@@ -122,7 +233,7 @@ function RegisterAlumnoForm() {
                 name="fecha_nacimiento"
                 value={formData.fecha_nacimiento}
                 onChange={handleChange}
-                className="w-full input-class"
+                className="w-full input-class bg-white"
               />
             </div>
             
@@ -303,7 +414,15 @@ function RegisterAlumnoForm() {
           </div>
         </div>
         
-        <div className="flex justify-end space-x-4">
+{/* El campo de institución se ha eliminado ya que se asigna automáticamente */}
+{currentUser?.rol === 'Superadministrador' && (
+  <div className="mb-4 bg-blue-50 p-3 rounded-md border border-blue-200">
+    <p className="text-sm text-blue-700">
+      <strong>Nota:</strong> El alumno será registrado automáticamente en la institución asociada a tu cuenta ({currentUser?.institucion_id || 'No disponible'}).
+    </p>
+  </div>
+)}
+<div className="flex justify-end space-x-4">
           <button
             type="button"
             onClick={() => navigate('/alumnos')}

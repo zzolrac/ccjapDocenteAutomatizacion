@@ -1,0 +1,146 @@
+{
+  "name": "Procesamiento de Mensajes de WhatsApp",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Procesar mensaje de WhatsApp\nconst message = $input.first();\n\n// Extraer información del mensaje\nconst body = message.json.body;\nconst from = message.json.from || '';\nconst timestamp = message.json.timestamp || new Date().toISOString();\n\n// Determinar el tipo de mensaje\nlet messageType = 'OTRO';\nlet responseMessage = '';\nlet isAbsence = false;\nlet studentName = '';\nlet grade = '';\nlet section = '';\n\n// Verificar si es un reporte de ausencia (ejemplo: \"Ausente: Juan Pérez, 3A\")\nconst absenceMatch = body.match(/ausente[\s:]*([^,]+)(?:,\s*(\d+[A-Za-z]?))?/i);\nif (absenceMatch) {\n  messageType = 'AUSENCIA';\n  isAbsence = true;\n  studentName = (absenceMatch[1] || '').trim();\n  if (absenceMatch[2]) {\n    // Extraer grado y sección si están presentes\n    const gradeSection = absenceMatch[2].trim();\n    const gradeSectionMatch = gradeSection.match(/(\d+)([A-Za-z]?)/);\n    if (gradeSectionMatch) {\n      grade = gradeSectionMatch[1];\n      section = gradeSectionMatch[2] || 'A'; // Por defecto sección A si no se especifica\n    }\n  }\n  responseMessage = `✅ Se ha registrado la ausencia de ${studentName}${grade ? ` del ${grade}° grado${section ? ` sección ${section.toUpperCase()}` : ''}` : ''}.`;\n} 
+// Verificar si es un saludo\nelse if (/hola|buen(a|o)s\s*(d[ií]as|tardes|noches)/i.test(body)) {\n  messageType = 'SALUDO';\n  responseMessage = '¡Hola! Gracias por contactarnos. ¿En qué puedo ayudarte? Puedes reportar ausencias, consultar calificaciones o información general.';\n} 
+// Verificar si es una consulta de calificaciones\nelse if (/calificaci[oó]n|nota/i.test(body)) {\n  messageType = 'CONSULTA_CALIFICACIONES';\n  responseMessage = 'Para consultar calificaciones, por favor proporciona el nombre completo del estudiante y el grado.';\n} 
+// Verificar si es una consulta de horarios\nelse if (/horario|horas?/i.test(body)) {\n  messageType = 'HORARIO';\n  responseMessage = 'El horario de atención es de lunes a viernes de 7:00 AM a 3:00 PM. ¿Neitas información sobre algún horario en específico?';
+}
+
+// Preparar datos para enviar al backend\nconst payload = {\n  phone: from,\n  message: body,\n  messageType: messageType,\n  studentName: studentName,\n  grade: grade,\n  section: section,\n  isAbsence: isAbsence,\n  timestamp: timestamp\n};\n\n// Si hay una respuesta automática configurada\nif (responseMessage) {\n  payload.response = {\n    message: responseMessage,\n    type: 'AUTOMATIC_REPLY'\n  };\n}\n\nreturn {\n  json: payload\n};"
+      },
+      "name": "Procesar Mensaje",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://backend:3001/api/waapi/webhook",
+        "options": {}
+      },
+      "name": "Enviar a Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        950,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Respuesta Exitosa",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Verificar si hay una respuesta automática para enviar\nconst responseData = $input.first().json;\n\nif (responseData.response) {\n  // Aquí iría la lógica para enviar la respuesta automática a través de WhatsApp\n  // Por ahora, simplemente la mostramos en los logs\n  console.log('Respuesta automática a enviar:', responseData.response.message);\n  \n  // Podríamos agregar un nodo HTTP Request aquí para enviar la respuesta a través de la API de WhatsApp\n  return {\n    json: {\n      status: 'success',\n      responseSent: true,\n      response: responseData.response\n    }\n  };\n}\n\nreturn {\n  json: {\n    status: 'success',\n    responseSent: false,\n    message: 'No se requiere respuesta automática'\n  }\n};"
+      },
+      "name": "Enviar Respuesta Automática",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Procesar Mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar Mensaje": {
+      "main": [
+        [
+          {
+            "node": "Enviar a Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar a Backend": {
+      "main": [
+        [
+          {
+            "node": "Enviar Respuesta Automática",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Respuesta Automática": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Exitosa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "tags": ["whatsapp", "automatización", "escuela"]
+}

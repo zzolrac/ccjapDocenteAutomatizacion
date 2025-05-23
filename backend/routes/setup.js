@@ -48,6 +48,89 @@ router.post('/complete-setup', async (req, res) => {
       return res.status(403).json({ error: 'El sistema ya ha sido configurado. No se puede ejecutar el setup nuevamente.' });
     }
 
+    // Crear tablas si no existen
+    console.log('Creando tablas de base de datos si no existen...');
+    await client.query(`
+      -- Tabla para la institución
+      CREATE TABLE IF NOT EXISTS instituciones (
+          id SERIAL PRIMARY KEY,
+          nombre VARCHAR(255) NOT NULL,
+          logo_url VARCHAR(255),
+          fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Tabla para los usuarios (Directores, Maestros, Superadministrador)
+      CREATE TABLE IF NOT EXISTS usuarios (
+          id SERIAL PRIMARY KEY,
+          nombre VARCHAR(255) NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          rol VARCHAR(50) NOT NULL CHECK (rol IN ('Superadministrador', 'Director', 'Maestro', 'Padre')), -- Roles definidos
+          institucion_id INTEGER REFERENCES instituciones(id) ON DELETE CASCADE, -- Cada usuario pertenece a una institución
+          fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Tabla para los alumnos
+      CREATE TABLE IF NOT EXISTS alumnos (
+          id SERIAL PRIMARY KEY,
+          nombre VARCHAR(255) NOT NULL,
+          apellido VARCHAR(255) NOT NULL,
+          fecha_nacimiento DATE,
+          codigo_alumno VARCHAR(100) UNIQUE, -- Código interno del alumno si existe
+          grado VARCHAR(50),
+          seccion VARCHAR(50),
+          institucion_id INTEGER REFERENCES instituciones(id) ON DELETE CASCADE,
+          maestro_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL, -- Maestro tutor o principal
+          fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Tabla para registrar ausencias
+      CREATE TABLE IF NOT EXISTS ausencias (
+          id SERIAL PRIMARY KEY,
+          alumno_id INTEGER REFERENCES alumnos(id) ON DELETE CASCADE,
+          fecha DATE NOT NULL,
+          motivo TEXT,
+          reportado_por_usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL, -- Quién reportó (Director/Maestro)
+          notificado_a_usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL, -- A quién se notificó (Maestro)
+          fecha_reporte TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          estado VARCHAR(50) DEFAULT 'Reportada' CHECK (estado IN ('Reportada', 'Confirmada', 'Justificada')), -- Estado de la ausencia
+          UNIQUE (alumno_id, fecha) -- Un alumno solo puede tener una ausencia por día
+      );
+
+      -- Tabla para registrar tareas (simplificado por ahora)
+      CREATE TABLE IF NOT EXISTS tareas (
+          id SERIAL PRIMARY KEY,
+          titulo VARCHAR(255) NOT NULL,
+          descripcion TEXT,
+          fecha_asignacion DATE DEFAULT CURRENT_DATE,
+          fecha_entrega DATE,
+          maestro_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+          institucion_id INTEGER REFERENCES instituciones(id) ON DELETE CASCADE,
+          fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Tabla para registrar mensajes de WhatsApp (para el flujo de automatización)
+      CREATE TABLE IF NOT EXISTS mensajes_wa (
+          id SERIAL PRIMARY KEY,
+          wa_message_id VARCHAR(255) UNIQUE, -- ID del mensaje en WhatsApp si está disponible
+          direccion VARCHAR(10) NOT NULL CHECK (direccion IN ('entrada', 'salida')), -- 'entrada' o 'salida'
+          remitente VARCHAR(255) NOT NULL, -- Número de teléfono o identificador
+          destinatario VARCHAR(255) NOT NULL, -- Número de teléfono o identificador
+          contenido TEXT NOT NULL,
+          fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          tipo_mensaje VARCHAR(50), -- e.g., 'text', 'image', 'absence_report', 'task_query'
+          estado VARCHAR(50) DEFAULT 'Recibido' CHECK (estado IN ('Recibido', 'Procesando', 'Procesado', 'Error', 'Enviado', 'Entregado', 'Leido')),
+          referencia_mensaje_id INTEGER REFERENCES mensajes_wa(id) ON DELETE SET NULL, -- Para enlazar respuestas o confirmaciones
+          alumno_id INTEGER REFERENCES alumnos(id) ON DELETE SET NULL, -- Si el mensaje está relacionado con un alumno específico
+          usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL, -- Si el mensaje está relacionado con un usuario específico (maestro/director)
+          institucion_id INTEGER REFERENCES instituciones(id) ON DELETE CASCADE
+      );
+    `);
+    console.log('Tablas creadas o ya existentes.');
+
     // Verificar si el email del admin ya está en uso
     const emailExists = await client.query('SELECT 1 FROM usuarios WHERE email = $1', [admin_email]);
     if (emailExists.rows.length > 0) {

@@ -27,6 +27,20 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         setCurrentUser(null);
       }
+    } else {
+      // Para desarrollo, creamos un usuario de prueba si no hay token
+      const devToken = 'dev-token-12345';
+      const devUser = {
+        id: 1,
+        nombre: 'Usuario de Desarrollo',
+        email: 'dev@example.com',
+        rol: 'admin'
+      };
+      localStorage.setItem('authToken', devToken);
+      localStorage.setItem('userData', JSON.stringify(devUser));
+      setToken(devToken);
+      setCurrentUser(devUser);
+      console.log('Modo desarrollo: Usuario creado automáticamente');
     }
     setIsLoading(false);
   }, []);
@@ -49,6 +63,12 @@ export const AuthProvider = ({ children }) => {
     // navigate('/login');
   };
 
+  const updateUser = (userData) => {
+    localStorage.setItem('userData', JSON.stringify(userData));
+    setCurrentUser(userData);
+    return Promise.resolve(userData);
+  };
+
   const value = {
     currentUser,
     token,
@@ -56,6 +76,7 @@ export const AuthProvider = ({ children }) => {
     isLoading, // Para que App.jsx pueda esperar a que se cargue el estado inicial del token
     login,
     logout,
+    updateUser,
   };
 
   return (

@@ -48,3 +48,12 @@
   color: #888;
 }
 */
+
+.input-class {
+  background-color: white; /* or any other color you prefer */
+  padding: 8px; /* Add some padding */
+  appearance: none; /* Remove default browser styling */
+  border: 1px solid #ccc; /* Add a border */
+  border-radius: 4px; /* Add rounded corners */
+  color: black; /* Set text color to black */
+}

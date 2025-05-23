@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 // TODO: Mover a variable de entorno, debe ser la misma que en auth.js
-const JWT_SECRET = 'tu_super_secreto_jwt_aqui_cambiar_en_produccion'; 
+const JWT_SECRET = 'tu_super_secreto_jwt_aqui_cambiar_en_produccion';
 
 const authMiddleware = (req, res, next) => {
   // Obtener token del header (formato común: Bearer TOKEN)

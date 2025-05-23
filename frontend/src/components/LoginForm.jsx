@@ -23,6 +23,13 @@ function LoginForm() {
       });
 
       const data = await response.json();
+      console.log('Response from login:', data);
+      if (data.user && data.user.institucion_id) {
+        data.user.institucion_id = data.user.institucion_id;
+      }
+      if (data.user && data.user.institucion_id) {
+        data.user.institucion_id = data.user.institucion_id;
+      }
 
       if (!response.ok) {
         throw new Error(data.error || `Error ${response.status}`);
@@ -30,6 +37,7 @@ function LoginForm() {
 
       // Asumiendo que el backend devuelve { token, user: { id, email, rol, nombre } }
       if (data.token && data.user) {
+        console.log('User data being stored in AuthContext:', data.user);
         login(data.token, data.user); // Llama a la función login del AuthContext
         navigate('/'); // Redirigir al dashboard después del login
         // No es necesario window.location.reload() si el estado de App se actualiza por el contexto
